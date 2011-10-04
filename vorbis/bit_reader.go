@@ -1,18 +1,30 @@
 package vorbis
 
-type bitReader struct {
-  data []byte
-  byte_pos,bit_pos int
+import (
+  "io"
+  "os"
+)
+
+type BitReader struct {
+  in      io.ByteReader
+  current byte
+  bit_pos int
+  err     os.Error
 }
-func makeBitReader(data []byte) *bitReader {
-  var br bitReader
-  br.data = data
+func MakeBitReader(in io.ByteReader) *BitReader {
+  var br BitReader
+  br.in = in
+  br.bit_pos = 8
   return &br
 }
 
+func (br *BitReader) CheckError() os.Error {
+  return br.err
+}
+
 // 0 <= n < 8
-func (br *bitReader) readAtMost(n int) (read int, bits uint32) {
-  bits = uint32(br.data[br.byte_pos])
+func (br *BitReader) readAtMost(n int) (read int, bits uint32) {
+  bits = uint32(br.current)
   bits = bits >> uint(br.bit_pos)
   bits = bits & ((1 << uint(n)) - 1)
   read = 8 - br.bit_pos
@@ -22,13 +34,17 @@ func (br *bitReader) readAtMost(n int) (read int, bits uint32) {
   br.bit_pos += read
   if br.bit_pos == 8 {
     br.bit_pos = 0
-    br.byte_pos++
+    br.current, br.err = br.in.ReadByte()
   }
   return
 }
 
 // 0 <= n < 32
-func (br *bitReader) ReadBits(n int) (bits uint32) {
+func (br *BitReader) ReadBits(n int) (uint32) {
+  if br.err != nil {
+    return 0
+  }
+  var bits uint32
   pos := 0
   for n > 0 {
     read,next := br.readAtMost(n)
@@ -36,6 +52,6 @@ func (br *bitReader) ReadBits(n int) (bits uint32) {
     pos += read
     n -= read
   }
-  return
+  return bits
 }
 
