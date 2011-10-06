@@ -138,33 +138,61 @@ func (v *vorbisDecoder) readCommentHeader(page ogg.Page) {
 }
 
 type setupHeader struct {
-  codebooks []codebook
+  Codebooks []Codebook
 }
 
-type codebookEntry struct {
-  unused bool
-  length int
+type CodebookEntry struct {
+  Unused   bool
+  Length   int
+  Codeword uint32
 }
 
-type codebook struct {
-  dimensions int
-  entries    []codebookEntry
-  multiplicands []uint32
+type Codebook struct {
+  Dimensions    int
+  Entries       []CodebookEntry
+  Multiplicands []uint32
 
-  minimum_value float32
-  delta_value   float32
-  sequence_p    bool
+  Minimum_value float32
+  Delta_value   float32
+  Sequence_p    bool
 }
 
-func (book *codebook) decode(br *BitReader) {
-  fmt.Printf("Reading codebook\n")
+func (book *Codebook) AssignCodewords() {
+  max_len := 0
+  for i := range book.Entries {
+    if book.Entries[i].Length > max_len {
+      max_len = book.Entries[i].Length
+    }
+  }
+  min := make([]uint32, max_len + 1)
+  for i := range book.Entries {
+    length := book.Entries[i].Length
+    book.Entries[i].Codeword = min[length]
+    min[length]++
+    for j := length + 1; j < len(min); j++ {
+      next := min[j-1] << 1
+      if next > min[j] {
+        min[j] = next
+      }
+    }
+    for j := length - 1; j >= 0; j-- {
+      prev := min[j+1] >> 1
+      if prev > min[j] {
+        min[j] = prev
+      }
+    }
+  }
+}
+
+func (book *Codebook) decode(br *BitReader) {
+  fmt.Printf("Reading Codebook\n")
   if br.ReadBits(24) != 0x564342 {
     panic("Codebook sync pattern not found")
   }
 
-  book.dimensions = int(br.ReadBits(16))
+  book.Dimensions = int(br.ReadBits(16))
   num_entries := int(br.ReadBits(24))
-  book.entries = make([]codebookEntry, num_entries)
+  book.Entries = make([]CodebookEntry, num_entries)
   ordered := br.ReadBits(1) == 1
 
 
@@ -175,54 +203,54 @@ func (book *codebook) decode(br *BitReader) {
       current_length := int(br.ReadBits(5)) + 1
       number := int(br.ReadBits(ilog(uint32(num_entries - current_entry))))
       for i := 0; i < number; i++ {
-        book.entries[current_entry + i].length = current_length
+        book.Entries[current_entry + i].Length = current_length
       }
       current_length++
       current_entry += number
       if current_entry >= num_entries {
-        panic("Error decoding codebooks")
+        panic("Error decoding Codebooks")
       }
     }
   } else {
     sparse := br.ReadBits(1) == 1
     if sparse {
-      for i := range book.entries {
+      for i := range book.Entries {
         flag := br.ReadBits(1) == 1
         if flag {
-          book.entries[i].length = int(br.ReadBits(5)) + 1
+          book.Entries[i].Length = int(br.ReadBits(5)) + 1
         } else {
-          book.entries[i].unused = true
+          book.Entries[i].Unused = true
         }
       }
     } else {
-      for i := range book.entries {
-        book.entries[i].length = int(br.ReadBits(5)) + 1
+      for i := range book.Entries {
+        book.Entries[i].Length = int(br.ReadBits(5)) + 1
       }
     }
   }
 
   // read the vector lookup table
-  codebook_lookup_type := int(br.ReadBits(4))
-  switch codebook_lookup_type {
+  Codebook_lookup_type := int(br.ReadBits(4))
+  switch Codebook_lookup_type {
     case 0:
       // no vector lookup
 
     case 1:
       fallthrough
     case 2:
-      book.minimum_value := math.Float32frombits(br.ReadBits(32))
-      book.delta_value := math.Float32frombits(br.ReadBits(32))
-      codebook_value_bits := int(br.ReadBits(4) + 1)
-      book.sequence_p := br.ReadBits(1) == 1
-      var codebook_lookup_values int
-      if codebook_lookup_type == 1 {
-        codebook_lookup_values = Lookup1Values(book.entries, book.dimensions)
+      book.Minimum_value = math.Float32frombits(br.ReadBits(32))
+      book.Delta_value = math.Float32frombits(br.ReadBits(32))
+      Codebook_value_bits := int(br.ReadBits(4) + 1)
+      book.Sequence_p = br.ReadBits(1) == 1
+      var Codebook_lookup_values int
+      if Codebook_lookup_type == 1 {
+        Codebook_lookup_values = Lookup1Values(len(book.Entries), book.Dimensions)
       } else {
-        codebook_lookup_values = len(book.entries) * book.dimensions
+        Codebook_lookup_values = len(book.Entries) * book.Dimensions
       }
-      book.multiplicands = make([]uint32, codebook_lookup_values)
-      for i := range book.multiplicands {
-        book.multiplicands = br.ReadBits(codebook_value_bits)
+      book.Multiplicands = make([]uint32, Codebook_lookup_values)
+      for i := range book.Multiplicands {
+        book.Multiplicands[i] = br.ReadBits(Codebook_value_bits)
       }
 
     default:
@@ -254,13 +282,13 @@ func (v *vorbisDecoder) readSetupHeader(page ogg.Page) {
   }
 
 
-  // Decode codebooks
-  num_codebooks,err := v.buffer.ReadByte()
+  // Decode Codebooks
+  num_Codebooks,err := v.buffer.ReadByte()
   check(err)
-  v.setup_header.codebooks = make([]codebook, int(num_codebooks))
+  v.setup_header.Codebooks = make([]Codebook, int(num_Codebooks))
   br := MakeBitReader(v.buffer)
-  for i := range v.setup_header.codebooks {
-    v.setup_header.codebooks[i].decode(br)
+  for i := range v.setup_header.Codebooks {
+    v.setup_header.Codebooks[i].decode(br)
   }
 
 }

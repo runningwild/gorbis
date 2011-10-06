@@ -44,3 +44,54 @@ func BitReaderSpec(c gospec.Context) {
   })
 }
 
+// Entry Length Codeword
+//   0      2     00
+//   1      4     0100
+//   2      4     0101
+//   3      4     0110
+//   4      4     0111
+//   5      2     10
+//   6      3     110
+//   7      3     111
+func HuffmanAssignmentspec(c gospec.Context) {
+  var codebook vorbis.Codebook
+  codebook.Entries = make([]vorbis.CodebookEntry, 8)
+  codebook.Entries[0].Length = 2
+  codebook.Entries[1].Length = 4
+  codebook.Entries[2].Length = 4
+  codebook.Entries[3].Length = 4
+  codebook.Entries[4].Length = 4
+  codebook.Entries[5].Length = 2
+  codebook.Entries[6].Length = 3
+  codebook.Entries[7].Length = 3
+  codebook.AssignCodewords()
+  c.Expect(codebook.Entries[0].Codeword, Equals, uint32(0))
+  c.Expect(codebook.Entries[1].Codeword, Equals, uint32(4))
+  c.Expect(codebook.Entries[2].Codeword, Equals, uint32(5))
+  c.Expect(codebook.Entries[3].Codeword, Equals, uint32(6))
+  c.Expect(codebook.Entries[4].Codeword, Equals, uint32(7))
+  c.Expect(codebook.Entries[5].Codeword, Equals, uint32(2))
+  c.Expect(codebook.Entries[6].Codeword, Equals, uint32(6))
+  c.Expect(codebook.Entries[7].Codeword, Equals, uint32(7))
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
