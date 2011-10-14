@@ -121,10 +121,19 @@ func Decode(in io.Reader) os.Error {
     codec.Add(page)
     if page.Header_type & 0x4 != 0 {
       codec.Finish()
-      streams[serial] = nil
+      streams[serial] = nil,false
     }
   }
-  return err
+  if err == nil {
+    return os.NewError("Quit processing without reaching EOF")
+  }
+  if err != os.EOF {
+    return err
+  }
+  if len(streams) > 0 {
+    return os.NewError(fmt.Sprintf("%d streams did not complete.", len(streams)))
+  }
+  return nil
 }
 
 
