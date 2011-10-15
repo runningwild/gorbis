@@ -11,6 +11,17 @@ func iPow(b,e int) int {
   return iPow(b*b, e/2)
 }
 
+func ilog(n uint32) int {
+  e := 31
+  bit := uint32(1) << 31
+  for e >= 0 {
+    if (n & bit) != 0 { return e + 1 }
+    bit = bit >> 1
+    e--
+  }
+  return 0
+}
+
 // From the spec: The return value for this function is defined to be ’the greatest integer
 // value for which [return_value] to the power of [codebook_dimensions] is less than or equal to
 // [codebook_ entries]’.

@@ -313,7 +313,7 @@ func (book *Codebook) decode(br *BitReader) {
       }
 
     default:
-      panic("Unknown vectork lookup method")
+      panic("Unknown vector lookup method")
   }
 
   // Assign huffman values
@@ -325,17 +325,6 @@ func (book *Codebook) decode(br *BitReader) {
     case 2:
       book.BuildVQType2()
   }
-}
-
-func ilog(n uint32) int {
-  e := 31
-  bit := uint32(1) << 31
-  for e > 0 {
-    if (n & bit) != 0 { return e }
-    bit = bit >> 1
-    e--
-  }
-  return 0
 }
 
 func (v *vorbisDecoder) readSetupHeader(page ogg.Page) {
@@ -352,6 +341,7 @@ func (v *vorbisDecoder) readSetupHeader(page ogg.Page) {
 
   // Decode Codebooks
   num_Codebooks,err := v.buffer.ReadByte()
+  num_Codebooks++
   check(err)
   v.setup_header.Codebooks = make([]Codebook, int(num_Codebooks))
   br := MakeBitReader(v.buffer)
@@ -359,12 +349,199 @@ func (v *vorbisDecoder) readSetupHeader(page ogg.Page) {
     v.setup_header.Codebooks[i].decode(br)
   }
 
+  // Read Time Domain Transfers
+  // These are placeholder values in the vorbis 1
+  // bitstream, but they must be read anyway
+  time_transfers_count := int(br.ReadBits(6) + 1)
+  for i := 0; i < time_transfers_count; i++ {
+    if br.ReadBits(16) != 0 {
+      panic("Time Domain Transfer Value != 0")
+    }
+  }
+
+  // Read Floors
+  floor_count := int(br.ReadBits(6) + 1)
+  v.floor_configs = make([]float64, floor_count)
+  fmt.Printf("Parsing floors %d\n", floor_count)
+  for _ = range v.floor_configs {
+    floor_type := int(br.ReadBits(16))
+    switch floor_type {
+      case 0:
+        var f Floor0
+        fmt.Printf("0\n")
+        f.HeaderDecode(br, len(v.setup_header.Codebooks))
+      case 1:
+        var f Floor1
+        fmt.Printf("1\n")
+        f.HeaderDecode(br)
+      default:
+        panic("Unknown floor type.")
+    }
+  }
+
+  // Read Resiudes
+  residue_count := int(br.ReadBits(6) + 1)
+  residue_types := make([]int, residue_count)
+  for i := range residue_types {
+    residue_types[i] = int(br.ReadBits(16))
+    if residue_types[i] > 2 {
+      panic("Unknown residue type.")
+    }
+    br.ReadBits(24)
+    br.ReadBits(24)
+    br.ReadBits(24) // + 1
+    residue_classifications := br.ReadBits(6) + 1
+    br.ReadBits(8)
+    // TODO: There are some checks that can go here
+    residue_cascades := make([]uint32, residue_classifications)
+    for i := range residue_cascades {
+      high_bits := 0
+      low_bits := int(br.ReadBits(3))
+      bit_flag := br.ReadBits(1) != 0
+      if bit_flag {
+        high_bits = int(br.ReadBits(5))
+      }
+      //residue cascade
+      residue_cascades[i] = uint32(high_bits * 8 + low_bits)
+    }
+    for i := 0; i < int(residue_classifications); i++ {
+      for j := 0; j < 8; j++ {
+        if (residue_cascades[i] & (uint32(1) << uint32(j))) != 0 {
+          br.ReadBits(8)
+        }
+      }
+    }
+  }
+
+  // Read Mappings
+  mapping_count := int(br.ReadBits(6) + 1)
+  for i := 0; i < mapping_count; i++ {
+    mapping_type := int(br.ReadBits(16))
+    if mapping_type != 0 {
+      panic("Found a non-zero mapping type.")
+    }
+    flag := br.ReadBits(1) != 0
+    submaps := 1
+    if flag {
+      submaps = int(br.ReadBits(4) + 1)
+    }
+    if br.ReadBits(1) != 0 {
+      coupling_steps := int(br.ReadBits(8) + 1)
+      for j := 0; j < coupling_steps; j++ {
+        bits := ilog(uint32(v.id_header.Channels) - 1)
+        br.ReadBits(bits)
+        br.ReadBits(bits)
+      }
+    }
+    if br.ReadBits(2) != 0 {
+      panic("Non-zero reserved bits found when reading mappings.")
+    }
+    if submaps > 1 {
+      for j := 0; j < int(v.id_header.Channels); j++ {
+        br.ReadBits(4)
+      }
+    }
+    for j := 0; j < submaps; j++ {
+      br.ReadBits(8)
+      br.ReadBits(8)
+      br.ReadBits(8)
+    }
+  }
+
+  // Read Modes
+  mode_count := int(br.ReadBits(6) + 1)
+  for i := 0; i < mode_count; i++ {
+    br.ReadBits(1)
+    window_type := int(br.ReadBits(16))
+    if window_type != 0 {
+      panic("Found non-zero window type while reading modes.")
+    }
+    transform_type := int(br.ReadBits(16))
+    if transform_type != 0 {
+      panic("Found non-zero transform type while reading modes.")
+    }
+    br.ReadBits(8)
+  }
+
+  // Frame
+  if br.ReadBits(1) == 0 {
+    panic("Framing error in setup header.")
+  }
+}
+
+type Floor interface {}
+type Floor0 struct {
+  order            int
+  rate             int
+  bark_map_size    int
+  amplitude_bits   int
+  amplitude_offset int
+  books []int
+}
+func (f *Floor0) HeaderDecode(br *BitReader, max_books int) {
+  f.order = int(br.ReadBits(8))
+  f.rate = int(br.ReadBits(16))
+  f.bark_map_size = int(br.ReadBits(16))
+  f.amplitude_bits = int(br.ReadBits(6))
+  f.amplitude_offset = int(br.ReadBits(8))
+  num_books := int(br.ReadBits(4) + 1)
+  f.books = make([]int, num_books)
+  for i := range f.books {
+    f.books[i] = int(br.ReadBits(8))
+    if f.books[i] < 0 || f.books[i] >= max_books {
+      panic("Invalid codebook specified in Floor0 decode.")
+    }
+  }
+}
+
+type Floor1 struct {
+  
+}
+func (f *Floor1) HeaderDecode(br *BitReader) {
+  num_partitions := int(br.ReadBits(5))
+  max_class := -1
+  partition_class_list := make([]int, num_partitions)
+  for i := range partition_class_list {
+    partition_class_list[i] = int(br.ReadBits(4))
+    if partition_class_list[i] > max_class {
+      max_class = partition_class_list[i]
+    }
+  }
+  class_dims := make([]int, max_class + 1)
+  class_subclasses := make([]int, max_class + 1)
+  class_masterbooks := make([]int, max_class + 1)
+  subclass_books := make([][]int, max_class + 1)
+  for i := 0; i <= max_class; i++ {
+    class_dims[i] = int(br.ReadBits(3) + 1)
+    class_subclasses[i] = int(br.ReadBits(2))
+    if class_subclasses[i] > 0 {
+      class_masterbooks[i] = int(br.ReadBits(8))
+    }
+    subclass_books[i] = make([]int, int(1 << uint(class_subclasses[i])))
+    for j := 0; j < int(1 << uint(class_subclasses[i])); j++ {
+      // 12
+      subclass_books[i][j] = int(br.ReadBits(8) - 1)
+    }
+  }
+  multiplier := int(br.ReadBits(2)) + 1
+  _ = multiplier
+  rangebits := int(br.ReadBits(4))
+  xvals := make([]int, 2)
+  xvals[0] = 0
+  xvals[1] = int(1 << uint(rangebits))
+  for i := 0; i < num_partitions; i++ {
+    current_class_number := partition_class_list[i]
+    for j := 0; j < class_dims[current_class_number]; j++ {
+      xvals = append(xvals, int(br.ReadBits(rangebits)))
+    }
+  }
 }
 
 func (v *vorbisDecoder) readAudioPacket(page ogg.Page) {
-  b,err := v.buffer.ReadByte()
-  check(err)
-  fmt.Printf("Packet type: %d\n", b)
+  br := MakeBitReader(v.buffer)
+  if br.ReadBits(1) != 0 {
+    fmt.Printf("Warning: Not an audio packet")
+  }
 }
 
 
@@ -388,34 +565,53 @@ const (
 
 type vorbisDecoder struct {
   mode mode
-  id_header idHeader
+  id_header      idHeader
   comment_header commentHeader
-  setup_header setupHeader
+  setup_header   setupHeader
+  floor_configs  []float64
   buffer *bytes.Buffer
 }
 func (v *vorbisDecoder) Add(page ogg.Page) {
+  // Might neet to paste a few packets together before we start reading
   v.buffer.Write(page.Data)
   if len(page.Segment_table) > 0 && page.Segment_table[len(page.Segment_table) - 1] == 255 {
     return
   }
+
   switch v.mode {
     case readId:
       fmt.Printf("Read id\n")
       v.readIdHeader(page)
+      fmt.Printf("After id: %d\n", v.buffer.Len())
       v.mode++
+      fallthrough
 
     case readComment:
+      if v.buffer.Len() == 0 {
+        // This could happen if the id and comment headers aren't in the
+        // same packet.  The spec really doesn't specify how it should be.
+        // TODO: For this pair of headers this might be specified to never
+        //       happen, so remove this if statement if that's the case.
+        return
+      }
       fmt.Printf("Read comment\n")
       v.readCommentHeader(page)
+      fmt.Printf("After comment: %d\n", v.buffer.Len())
       v.mode++
+      fallthrough
 
     case readSetup:
-      fmt.Printf("Read setup\n")
+      if v.buffer.Len() == 0 {
+        // This could happen if the comment and setup headers aren't in the
+        // same packet.  The spec really doesn't specify how it should be.
+        return
+      }
       v.readSetupHeader(page)
       v.mode++
 
     case readData:
       v.readAudioPacket(page)
+      v.buffer.Truncate(0)
   }
 }
 func (v *vorbisDecoder) Finish() {
