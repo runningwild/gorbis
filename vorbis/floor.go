@@ -1,6 +1,7 @@
 package vorbis
 
 type Floor interface {}
+
 type Floor0 struct {
   order            int
   rate             int
@@ -9,7 +10,22 @@ type Floor0 struct {
   amplitude_offset int
   books []int
 }
-func (f *Floor0) HeaderDecode(br *BitReader, max_books int) {
+
+func readFloor(br *BitReader, num_codebooks int) Floor {
+  floor_type := int(br.ReadBits(16))
+  switch floor_type {
+    case 0:
+      return decodeFloor0(br, num_codebooks)
+    case 1:
+      return decodeFloor1(br)
+    default:
+      panic("Unknown floor type.")
+  }
+  return nil
+}
+
+func decodeFloor0(br *BitReader, max_books int) Floor {
+  var f Floor0
   f.order = int(br.ReadBits(8))
   f.rate = int(br.ReadBits(16))
   f.bark_map_size = int(br.ReadBits(16))
@@ -23,12 +39,15 @@ func (f *Floor0) HeaderDecode(br *BitReader, max_books int) {
       panic("Invalid codebook specified in Floor0 decode.")
     }
   }
+  return &f
 }
 
 type Floor1 struct {
   
 }
-func (f *Floor1) HeaderDecode(br *BitReader) {
+
+func decodeFloor1(br *BitReader) Floor {
+  var f Floor1
   num_partitions := int(br.ReadBits(5))
   max_class := -1
   partition_class_list := make([]int, num_partitions)
@@ -66,4 +85,5 @@ func (f *Floor1) HeaderDecode(br *BitReader) {
       xvals = append(xvals, int(br.ReadBits(rangebits)))
     }
   }
+  return &f
 }

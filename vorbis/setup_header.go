@@ -8,7 +8,8 @@ import (
 type setupHeader struct {
   Codebooks []Codebook
 
-  floor_configs  []float64
+  Floor_configs   []Floor
+  Residue_configs []Residue
 }
 
 func (header setupHeader) read(buffer *bytes.Buffer, num_channels int) {
@@ -23,9 +24,9 @@ func (header setupHeader) read(buffer *bytes.Buffer, num_channels int) {
 
 
   // Decode Codebooks
-  num_Codebooks,_ := buffer.ReadByte()
-  num_Codebooks++
-  header.Codebooks = make([]Codebook, int(num_Codebooks))
+  codebook_count,_ := buffer.ReadByte()
+  codebook_count++
+  header.Codebooks = make([]Codebook, int(codebook_count))
   br := MakeBitReader(buffer)
   for i := range header.Codebooks {
     header.Codebooks[i].decode(br)
@@ -41,58 +42,17 @@ func (header setupHeader) read(buffer *bytes.Buffer, num_channels int) {
     }
   }
 
-  // Read Floors
   floor_count := int(br.ReadBits(6) + 1)
-  header.floor_configs = make([]float64, floor_count)
-  fmt.Printf("Parsing floors %d\n", floor_count)
-  for _ = range header.floor_configs {
-    floor_type := int(br.ReadBits(16))
-    switch floor_type {
-      case 0:
-        var f Floor0
-        fmt.Printf("0\n")
-        f.HeaderDecode(br, len(header.Codebooks))
-      case 1:
-        var f Floor1
-        fmt.Printf("1\n")
-        f.HeaderDecode(br)
-      default:
-        panic("Unknown floor type.")
-    }
+  header.Floor_configs = make([]Floor, floor_count)
+  for i := range header.Floor_configs {
+    header.Floor_configs[i] = readFloor(br, len(header.Codebooks))
   }
 
   // Read Resiudes
   residue_count := int(br.ReadBits(6) + 1)
-  residue_types := make([]int, residue_count)
-  for i := range residue_types {
-    residue_types[i] = int(br.ReadBits(16))
-    if residue_types[i] > 2 {
-      panic("Unknown residue type.")
-    }
-    br.ReadBits(24)
-    br.ReadBits(24)
-    br.ReadBits(24) // + 1
-    residue_classifications := br.ReadBits(6) + 1
-    br.ReadBits(8)
-    // TODO: There are some checks that can go here
-    residue_cascades := make([]uint32, residue_classifications)
-    for i := range residue_cascades {
-      high_bits := 0
-      low_bits := int(br.ReadBits(3))
-      bit_flag := br.ReadBits(1) != 0
-      if bit_flag {
-        high_bits = int(br.ReadBits(5))
-      }
-      //residue cascade
-      residue_cascades[i] = uint32(high_bits * 8 + low_bits)
-    }
-    for i := 0; i < int(residue_classifications); i++ {
-      for j := 0; j < 8; j++ {
-        if (residue_cascades[i] & (uint32(1) << uint32(j))) != 0 {
-          br.ReadBits(8)
-        }
-      }
-    }
+  header.Residue_configs = make([]Residue, residue_count)
+  for i := range header.Residue_configs {
+    header.Residue_configs[i] = readResidue(br)
   }
 
   // Read Mappings
