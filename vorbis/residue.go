@@ -1,6 +1,7 @@
 package vorbis
 
 type Residue interface {
+  // TODO: This was a dumb idea, fix it.
   read(br *BitReader)
 }
 

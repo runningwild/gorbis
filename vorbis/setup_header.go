@@ -10,6 +10,7 @@ type setupHeader struct {
 
   Floor_configs   []Floor
   Residue_configs []Residue
+  Mapping_configs []Mapping
 }
 
 func (header setupHeader) read(buffer *bytes.Buffer, num_channels int) {
@@ -57,37 +58,9 @@ func (header setupHeader) read(buffer *bytes.Buffer, num_channels int) {
 
   // Read Mappings
   mapping_count := int(br.ReadBits(6) + 1)
-  for i := 0; i < mapping_count; i++ {
-    mapping_type := int(br.ReadBits(16))
-    if mapping_type != 0 {
-      panic("Found a non-zero mapping type.")
-    }
-    flag := br.ReadBits(1) != 0
-    submaps := 1
-    if flag {
-      submaps = int(br.ReadBits(4) + 1)
-    }
-    if br.ReadBits(1) != 0 {
-      coupling_steps := int(br.ReadBits(8) + 1)
-      for j := 0; j < coupling_steps; j++ {
-        bits := ilog(uint32(num_channels) - 1)
-        br.ReadBits(bits)
-        br.ReadBits(bits)
-      }
-    }
-    if br.ReadBits(2) != 0 {
-      panic("Non-zero reserved bits found when reading mappings.")
-    }
-    if submaps > 1 {
-      for j := 0; j < int(num_channels); j++ {
-        br.ReadBits(4)
-      }
-    }
-    for j := 0; j < submaps; j++ {
-      br.ReadBits(8)
-      br.ReadBits(8)
-      br.ReadBits(8)
-    }
+  header.Mapping_configs = make([]Mapping, mapping_count)
+  for i := range header.Mapping_configs {
+    header.Mapping_configs[i] = readMapping(br, num_channels, floor_count, residue_count)
   }
 
   // Read Modes
