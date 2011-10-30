@@ -33,16 +33,16 @@ func makeVorbisDecoder() ogg.Codec {
   return &v
 }
 
-type mode int
+type codecMode int
 const (
-  readId mode = iota
+  readId codecMode = iota
   readComment
   readSetup
   readData
 )
 
 type vorbisDecoder struct {
-  mode mode
+  mode codecMode
   idHeader
   commentHeader
   setupHeader

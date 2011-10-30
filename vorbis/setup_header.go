@@ -11,6 +11,7 @@ type setupHeader struct {
   Floor_configs   []Floor
   Residue_configs []Residue
   Mapping_configs []Mapping
+  Mode_configs    []Mode
 }
 
 func (header setupHeader) read(buffer *bytes.Buffer, num_channels int) {
@@ -65,17 +66,9 @@ func (header setupHeader) read(buffer *bytes.Buffer, num_channels int) {
 
   // Read Modes
   mode_count := int(br.ReadBits(6) + 1)
-  for i := 0; i < mode_count; i++ {
-    br.ReadBits(1)
-    window_type := int(br.ReadBits(16))
-    if window_type != 0 {
-      panic("Found non-zero window type while reading modes.")
-    }
-    transform_type := int(br.ReadBits(16))
-    if transform_type != 0 {
-      panic("Found non-zero transform type while reading modes.")
-    }
-    br.ReadBits(8)
+  header.Mode_configs = make([]Mode, mode_count)
+  for i := range header.Mode_configs {
+    header.Mode_configs[i] = readMode(br, len(header.Mapping_configs))
   }
 
   // Frame
