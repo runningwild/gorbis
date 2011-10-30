@@ -21,7 +21,7 @@ type Codebook struct {
   Value_vectors [][]float64
 }
 
-func (book *Codebook) Decode(br *BitReader) int {
+func (book *Codebook) DecodeScalar(br *BitReader) int {
   // TODO: This obviously needs to be seriously optimized
   var word uint32
   for length := 0; length < 32; length++ {
@@ -34,6 +34,11 @@ func (book *Codebook) Decode(br *BitReader) int {
     word |= br.ReadBits(1)
   }
   panic("Codebook failed to decode properly.")
+}
+
+func (book *Codebook) DecodeVector(br *BitReader) []float64 {
+  index := book.DecodeScalar(br)
+  return book.Value_vectors[index]
 }
 
 func (book *Codebook) allocateTable() {

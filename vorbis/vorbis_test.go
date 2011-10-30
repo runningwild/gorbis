@@ -109,14 +109,14 @@ func HuffmanDecodeSpec(c gospec.Context) {
     v := []uint8{0x5F, 0x6E, 0x2A, 0x00}
     br := vorbis.MakeBitReader(bytes.NewBuffer(v))
 
-    c.Expect(codebook.Decode(br), Equals, 7)
-    c.Expect(codebook.Decode(br), Equals, 6)
-    c.Expect(codebook.Decode(br), Equals, 5)
-    c.Expect(codebook.Decode(br), Equals, 4)
-    c.Expect(codebook.Decode(br), Equals, 3)
-    c.Expect(codebook.Decode(br), Equals, 2)
-    c.Expect(codebook.Decode(br), Equals, 1)
-    c.Expect(codebook.Decode(br), Equals, 0)
+    c.Expect(codebook.DecodeScalar(br), Equals, 7)
+    c.Expect(codebook.DecodeScalar(br), Equals, 6)
+    c.Expect(codebook.DecodeScalar(br), Equals, 5)
+    c.Expect(codebook.DecodeScalar(br), Equals, 4)
+    c.Expect(codebook.DecodeScalar(br), Equals, 3)
+    c.Expect(codebook.DecodeScalar(br), Equals, 2)
+    c.Expect(codebook.DecodeScalar(br), Equals, 1)
+    c.Expect(codebook.DecodeScalar(br), Equals, 0)
   })
 }
 

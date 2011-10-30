@@ -14,7 +14,7 @@ type setupHeader struct {
   Mode_configs    []Mode
 }
 
-func (header setupHeader) read(buffer *bytes.Buffer, num_channels int) {
+func (header *setupHeader) read(buffer *bytes.Buffer, num_channels int) {
   b,_ := buffer.ReadByte()
   if b != 5 {
     panic(fmt.Sprintf("Header type == %d, expected type == 5.", b))

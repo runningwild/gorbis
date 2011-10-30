@@ -1,17 +1,14 @@
 package vorbis
 
-type Mode interface {
-}
-
-type mode struct {
-  block_flag int
+type Mode struct {
+  block_flag bool
   mapping    int
 }
 
 func readMode(br *BitReader, num_mappings int) Mode {
-  var m mode
+  var m Mode
 
-  m.block_flag = int(br.ReadBits(1))
+  m.block_flag = br.ReadBits(1) == 1
 
   // Don't bother storing this, we know it has to be zero
   window_type := int(br.ReadBits(16))
@@ -30,5 +27,5 @@ func readMode(br *BitReader, num_mappings int) Mode {
     panic("Mode mapping value is out of range.")
   }
 
-  return &m
+  return m
 }

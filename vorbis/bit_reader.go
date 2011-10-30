@@ -34,7 +34,11 @@ func (br *BitReader) readAtMost(n int) (read int, bits uint32) {
   br.bit_pos += read
   if br.bit_pos == 8 {
     br.bit_pos = 0
-    br.current, br.err = br.in.ReadByte()
+    var err os.Error
+    br.current, err = br.in.ReadByte()
+    if err != nil {
+      br.err = err
+    }
   }
   return
 }

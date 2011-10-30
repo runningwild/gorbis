@@ -1,9 +1,6 @@
 package vorbis
 
-type Mapping interface {  
-}
-
-type Mapping0 struct {
+type Mapping struct {
   couplings []coupling
 
   muxs    []int
@@ -24,7 +21,7 @@ func readMapping(br *BitReader, num_channels,num_floors,num_residues int) Mappin
   if mapping_type != 0 {
     panic("Found a non-zero mapping type.")
   }
-  var mapping Mapping0
+  var mapping Mapping
 
   flag := br.ReadBits(1) != 0
   submaps := 1
@@ -52,8 +49,9 @@ func readMapping(br *BitReader, num_channels,num_floors,num_residues int) Mappin
   if br.ReadBits(2) != 0 {
     panic("Non-zero reserved bits found when reading mappings.")
   }
+
+  mapping.muxs = make([]int, num_channels)
   if submaps > 1 {
-    mapping.muxs = make([]int, num_channels)
     for i := range mapping.muxs {
       mapping.muxs[i] = int(br.ReadBits(4))
       if mapping.muxs[i] >= submaps {
@@ -75,5 +73,5 @@ func readMapping(br *BitReader, num_channels,num_floors,num_residues int) Mappin
     }
   }
 
-  return &mapping
+  return mapping
 }
