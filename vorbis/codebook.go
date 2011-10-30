@@ -21,6 +21,21 @@ type Codebook struct {
   Value_vectors [][]float64
 }
 
+func (book *Codebook) Decode(br *BitReader) int {
+  // TODO: This obviously needs to be seriously optimized
+  var word uint32
+  for length := 0; length < 32; length++ {
+    for i := range book.Entries {
+      if book.Entries[i].Length == length && book.Entries[i].Codeword == word {
+        return i
+      }
+    }
+    word = word << 1
+    word |= br.ReadBits(1)
+  }
+  panic("Codebook failed to decode properly.")
+}
+
 func (book *Codebook) allocateTable() {
   // Build the table out of a single array
   vector := make([]float64, len(book.Entries) * book.Dimensions)

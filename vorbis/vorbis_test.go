@@ -54,7 +54,13 @@ func BitReaderSpec(c gospec.Context) {
 //   5      2     10
 //   6      3     110
 //   7      3     111
-func HuffmanAssignmentspec(c gospec.Context) {
+//
+// For testing, concatenating them all in order (notice they are reversed):
+// 00 0010 1010 0110 1110 01 011 111
+// 00 0010 1010 0110 1110 0101 1111
+//  0    2    A    6    E    5    F = 0x02A6E5F
+
+func HuffmanAssignmentSpec(c gospec.Context) {
   c.Specify("Basic huffman assignment", func() {
     var codebook vorbis.Codebook
     codebook.Entries = make([]vorbis.CodebookEntry, 8)
@@ -83,6 +89,34 @@ func HuffmanAssignmentspec(c gospec.Context) {
     codebook.Entries[0].Length = 0
     codebook.AssignCodewords()
     c.Expect(codebook.Entries[0].Codeword, Equals, uint32(0))
+  })
+}
+
+func HuffmanDecodeSpec(c gospec.Context) {
+  c.Specify("Basic huffman decode", func() {
+    var codebook vorbis.Codebook
+    codebook.Entries = make([]vorbis.CodebookEntry, 8)
+    codebook.Entries[0].Length = 2
+    codebook.Entries[1].Length = 4
+    codebook.Entries[2].Length = 4
+    codebook.Entries[3].Length = 4
+    codebook.Entries[4].Length = 4
+    codebook.Entries[5].Length = 2
+    codebook.Entries[6].Length = 3
+    codebook.Entries[7].Length = 3
+    codebook.AssignCodewords()
+
+    v := []uint8{0x5F, 0x6E, 0x2A, 0x00}
+    br := vorbis.MakeBitReader(bytes.NewBuffer(v))
+
+    c.Expect(codebook.Decode(br), Equals, 7)
+    c.Expect(codebook.Decode(br), Equals, 6)
+    c.Expect(codebook.Decode(br), Equals, 5)
+    c.Expect(codebook.Decode(br), Equals, 4)
+    c.Expect(codebook.Decode(br), Equals, 3)
+    c.Expect(codebook.Decode(br), Equals, 2)
+    c.Expect(codebook.Decode(br), Equals, 1)
+    c.Expect(codebook.Decode(br), Equals, 0)
   })
 }
 

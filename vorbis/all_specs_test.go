@@ -10,7 +10,8 @@ func TestAllSpecs(t *testing.T) {
   r := gospec.NewRunner()
 //  r.AddSpec(BitReaderSpec)
   r.AddSpec(Lookup1Spec)
-  r.AddSpec(HuffmanAssignmentspec)
+  r.AddSpec(HuffmanAssignmentSpec)
+  r.AddSpec(HuffmanDecodeSpec)
   gospec.MainGoTest(r, t)
 }
 
