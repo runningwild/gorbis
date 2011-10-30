@@ -83,6 +83,57 @@ func HuffmanAssignmentSpec(c gospec.Context) {
     c.Expect(codebook.Entries[7].Codeword, Equals, uint32(7))
   })
 
+  c.Specify("Another huffman assignment", func() {
+    var codebook vorbis.Codebook
+    codebook.Entries = make([]vorbis.CodebookEntry, 8)
+    codebook.Entries[0].Length = 1
+    codebook.Entries[1].Length = 3
+    codebook.Entries[2].Length = 4
+    codebook.Entries[3].Length = 7
+    codebook.Entries[4].Length = 2
+    codebook.Entries[5].Length = 5
+    codebook.Entries[6].Length = 6
+    codebook.Entries[7].Length = 7
+    codebook.AssignCodewords()
+    c.Expect(codebook.Entries[0].Codeword, Equals, uint32(0))
+    c.Expect(codebook.Entries[1].Codeword, Equals, uint32(4))
+    c.Expect(codebook.Entries[2].Codeword, Equals, uint32(10))
+    c.Expect(codebook.Entries[3].Codeword, Equals, uint32(0x58))
+    c.Expect(codebook.Entries[4].Codeword, Equals, uint32(3))
+    c.Expect(codebook.Entries[5].Codeword, Equals, uint32(0x17))
+    c.Expect(codebook.Entries[6].Codeword, Equals, uint32(0x2D))
+    c.Expect(codebook.Entries[7].Codeword, Equals, uint32(0x59))
+  })
+
+  c.Specify("Large huffman assignment", func() {
+    var codebook vorbis.Codebook
+    codebook.Entries = make([]vorbis.CodebookEntry, 100)
+    lengths := []int{ 3, 8, 9, 13, 10, 12, 12, 12, 12, 12, 6, 4, 6, 8, 6, 8,
+        10, 10, 11, 12, 8, 5, 4, 10, 4, 7, 8, 9, 10, 11, 13, 8, 10, 8, 9, 9,
+        11, 12, 13, 14, 10, 6, 4, 9, 3, 5, 6, 8, 10, 11, 11, 8, 6, 9, 5, 5, 6,
+        7, 9, 11, 12, 9, 7, 11, 6, 6, 6, 7, 8, 10, 12, 11, 9, 12, 7, 7, 6, 6,
+        7, 9, 13, 12, 10, 13, 9, 8, 7, 7, 7, 8, 11, 15, 11, 15, 11, 10, 9, 8,
+        7, 7 }
+    for i := range codebook.Entries {
+      codebook.Entries[i].Length = lengths[i]
+    }
+    codebook.AssignCodewords()
+    codewords := []uint32{ 0x0, 0x20, 0x42, 0x430, 0x87, 0x219, 0x21a, 0x21b,
+        0x220, 0x221, 0x9, 0x3, 0xa, 0x23, 0xb, 0x40, 0x89, 0x8a, 0x111,
+        0x22c, 0x41, 0x9, 0x5, 0x108, 0x6, 0x22, 0x43, 0x85, 0x109, 0x117,
+        0x431, 0x46, 0x11c, 0x70, 0x8f, 0xe2, 0x23a, 0x22d, 0x8ec, 0x11da,
+        0x1c6, 0x1d, 0x8, 0xe4, 0x5, 0xf, 0x24, 0x73, 0x1c7, 0x394, 0x395,
+        0x94, 0x26, 0x12a, 0x18, 0x19, 0x27, 0x4b, 0x12b, 0x396, 0x477,
+        0x1a0, 0x69, 0x397, 0x35, 0x36, 0x37, 0x70, 0xd1, 0x342, 0xd0c, 0x687,
+        0x1c4, 0xd0d, 0x72, 0x73, 0x3a, 0x3b, 0x78, 0x1c5, 0x1c60, 0xe31,
+        0x38d, 0x1c61, 0x1c7, 0xf2, 0x7a, 0x7b, 0x7c, 0xf3, 0x719, 0x23b6,
+        0x7d0, 0x23b7, 0x7d1, 0x3e9, 0x1f5, 0xfb, 0x7e, 0x7f }
+
+    for i := range codewords {
+      c.Expect(codebook.Entries[i].Codeword, Equals, codewords[i])
+    }
+  })
+
   c.Specify("Codebook with a single zero-bit entry", func() {
     var codebook vorbis.Codebook
     codebook.Entries = make([]vorbis.CodebookEntry, 1)

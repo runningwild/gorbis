@@ -1,7 +1,7 @@
 package vorbis
 
 import "math"
-import "fmt"
+
 type CodebookEntry struct {
   Unused   bool
   Length   int
@@ -39,10 +39,6 @@ func toBin(n uint32, l int) string {
 
 func (book *Codebook) DecodeScalar(br *BitReader) int {
   // TODO: This obviously needs to be seriously optimized
-  fmt.Printf("starting\n")
-  for i := range book.Entries {
-    fmt.Printf("%d: %s\n", i, toBin(book.Entries[i].Codeword, book.Entries[i].Length,))
-  }
   var word uint32
   for length := 0; length < 32; length++ {
     for i := range book.Entries {
@@ -53,7 +49,6 @@ func (book *Codebook) DecodeScalar(br *BitReader) int {
     word = word << 1
     bit := br.ReadBits(1)
     word |= bit
-    fmt.Printf("Read a %s, currently at %s\n", toBin(bit, 1), toBin(word, length + 1))
   }
   panic("Codebook failed to decode properly.")
 }
@@ -105,29 +100,35 @@ func (book *Codebook) BuildVQType2() {
 }
 
 func (book *Codebook) AssignCodewords() {
-  max_len := 0
+  marker := make([]uint32, 33)
   for i := range book.Entries {
-    if book.Entries[i].Unused { continue }
-    if book.Entries[i].Length > max_len {
-      max_len = book.Entries[i].Length
+    entry := &book.Entries[i]
+    if entry.Unused { continue }
+    if entry.Length == 0 { continue }
+    word := marker[entry.Length]
+    if entry.Length < 32 && (word >> uint(entry.Length)) != 0 {
+      panic("Codebook contains an overspecified huffman tree.")
     }
-  }
-  min := make([]uint32, max_len + 1)
-  for i := range book.Entries {
-    if book.Entries[i].Unused { continue }
-    length := book.Entries[i].Length
-    book.Entries[i].Codeword = min[length]
-    min[length]++
-    for j := length + 1; j < len(min); j++ {
-      next := min[j-1] << 1
-      if next > min[j] {
-        min[j] = next
+
+    entry.Codeword = word
+    for j := entry.Length; j > 0; j-- {
+      if marker[j] & 1 != 0 {
+        if j == 1 {
+          marker[1]++
+        } else {
+          marker[j] = marker[j - 1] << 1
+          break
+        }
       }
+      marker[j]++
     }
-    for j := length - 1; j >= 0; j-- {
-      prev := min[j+1] >> 1
-      if prev > min[j] {
-        min[j] = prev
+
+    for j := entry.Length + 1; j <= 32; j++ {
+      if marker[j] >> 1 == word {
+        word = marker[j]
+        marker[j] = marker[j - 1] << 1
+      } else {
+        break
       }
     }
   }
