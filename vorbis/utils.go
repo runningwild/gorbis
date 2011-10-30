@@ -22,6 +22,87 @@ func ilog(n uint32) int {
   return 0
 }
 
+func lowNeighbor(v []int, index int) int {
+  best := 0
+  max := v[0]
+  val := v[index]
+  for i := 1; i < index; i++ {
+    if v[i] >= val { continue }
+    if v[i] > max {
+      best = i
+      max = v[i]
+    }
+  }
+  return best
+}
+
+func highNeighbor(v []int, index int) int {
+  best := 0
+  min := v[0]
+  val := v[index]
+  for i := 1; i < index; i++ {
+    if v[i] <= val { continue }
+    if v[i] < min {
+      best = i
+      min = v[i]
+    }
+  }
+  return best
+}
+
+func renderPoint(x0,y0,x1,y1,X int) int {
+  dy := y1 - y0
+  adx := x1 - x0
+  ady := dy
+  if ady < 0 {
+    ady = -ady
+  }
+  err := ady * (X - x0)
+  off := err / adx
+  if dy < 0 {
+    return y0 - off
+  }
+  return y0 + off
+}
+
+// Copied straight from the spec, pretty sure it's bresenham's algorithm
+func renderLine(x0,y0,x1,y1 int, v []int) {
+  dy := y1 - y0
+  adx := x1 - x0
+  ady := dy
+  if ady < 0 {
+    ady = -ady
+  }
+  base := dy / adx
+  x := x0
+  y := y0
+  err := 0
+  var sy int
+  if dy < 0 {
+    sy = base - 1
+  } else {
+    sy = base + 1
+  }
+
+  abs_base := base
+  if abs_base < 0 {
+    abs_base = -abs_base
+  }
+  ady = ady - abs_base * adx
+
+  v[x] = y
+  for x := x0 + 1; x < x1 - 1; x++ {
+    err += ady
+    if err >= adx {
+      err -= adx
+      y += sy
+    } else {
+      y += base
+    }
+    v[x] = y
+  }
+}
+
 // From the spec: The return value for this function is defined to be ’the greatest integer
 // value for which [return_value] to the power of [codebook_dimensions] is less than or equal to
 // [codebook_ entries]’.

@@ -26,15 +26,14 @@ func (v *vorbisDecoder) readAudioPacket(page ogg.Page, num_channels int) {
   mode := v.Mode_configs[mode_number]
   mapping := v.Mapping_configs[mode.mapping]
 
-  window := v.generateWindow(br, mode)
-print(window)
+  _ = v.generateWindow(br, mode)
 
   // Floor curves
   for i := 0; i < num_channels; i++ {
     submap_number := mapping.muxs[i]
     floor_number := mapping.submaps[submap_number].floor
     floor := v.Floor_configs[floor_number]
-    fmt.Printf("%d\n", floor)
+    floor.Decode(br, v.Codebooks)
     // floor.Decode(br)
   }
 }

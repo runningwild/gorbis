@@ -1,7 +1,7 @@
 package vorbis
 
 import "math"
-
+import "fmt"
 type CodebookEntry struct {
   Unused   bool
   Length   int
@@ -21,8 +21,28 @@ type Codebook struct {
   Value_vectors [][]float64
 }
 
+func toBin(n uint32, l int) string {
+  ret := ""
+  for n > 0 {
+    if n % 2 == 0 {
+      ret = "0" + ret
+    } else {
+      ret = "1" + ret
+    }
+    n = n >> 1
+  }
+  for len(ret) < l {
+    ret = "0" + ret
+  }
+  return ret
+}
+
 func (book *Codebook) DecodeScalar(br *BitReader) int {
   // TODO: This obviously needs to be seriously optimized
+  fmt.Printf("starting\n")
+  for i := range book.Entries {
+    fmt.Printf("%d: %s\n", i, toBin(book.Entries[i].Codeword, book.Entries[i].Length,))
+  }
   var word uint32
   for length := 0; length < 32; length++ {
     for i := range book.Entries {
@@ -31,7 +51,9 @@ func (book *Codebook) DecodeScalar(br *BitReader) int {
       }
     }
     word = word << 1
-    word |= br.ReadBits(1)
+    bit := br.ReadBits(1)
+    word |= bit
+    fmt.Printf("Read a %s, currently at %s\n", toBin(bit, 1), toBin(word, length + 1))
   }
   panic("Codebook failed to decode properly.")
 }
