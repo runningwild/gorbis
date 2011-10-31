@@ -55,6 +55,7 @@ func (book *Codebook) DecodeScalar(br *BitReader) int {
 
 func (book *Codebook) DecodeVector(br *BitReader) []float64 {
   index := book.DecodeScalar(br)
+  print("index: ", index, "len: ", len(book.Value_vectors), "\n")
   return book.Value_vectors[index]
 }
 

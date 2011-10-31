@@ -30,11 +30,55 @@ func (v *vorbisDecoder) readAudioPacket(page ogg.Page, num_channels int) {
   window := v.generateWindow(br, mode)
 
   // Floor curves
+  // If the output for a floor for a particular channel is 'unused' that
+  // element of the array will be nil
+  floor_outputs := make([][]float64, num_channels)
   for i := 0; i < num_channels; i++ {
     submap_number := mapping.muxs[i]
     floor_number := mapping.submaps[submap_number].floor
     floor := v.Floor_configs[floor_number]
-    floor.Decode(br, v.Codebooks, len(window))
+    floor_outputs[i] = floor.Decode(br, v.Codebooks, len(window))
+  }
+
+  if br.CheckError() != nil {
+    // TODO: Need to handle an EOF error by zeroing channel data and skipping
+    // to the add/overlap output stage
+    panic("Not implemented")
+  }
+
+  // non-zero vector propagate
+  // If any coupling has either angle or magnitude unused, then we can't use
+  // either.  The spec doesn't seem to specify if channels can be used by more
+  // than one coupling, but I suspect not, so this should be an ok way to
+  // handle this.
+  for _,coupling := range mapping.couplings {
+    if floor_outputs[coupling.angle] == nil || floor_outputs[coupling.magnitude] == nil {
+      floor_outputs[coupling.angle] = nil
+      floor_outputs[coupling.magnitude] = nil
+    }
+  }
+
+  // residue decode
+  do_not_decode := make([]bool, num_channels)
+  residue_outputs := make([][]float64, num_channels)
+  for i,submap := range mapping.submaps {
+    ch := 0
+    for j := 0; j < num_channels; j++ {
+      if mapping.muxs[j] == i {
+        do_not_decode[ch] = floor_outputs[j] == nil
+        ch++
+      }
+    }
+
+    residues := v.Residue_configs[submap.residue].Decode(br, v.Codebooks, ch, do_not_decode, len(window)/2)
+
+    ch = 0
+    for j := 0; j < num_channels; j++ {
+      if mapping.muxs[j] == i {
+        residue_outputs[j] = residues[ch]
+        ch++
+      }
+    }
   }
 }
 
