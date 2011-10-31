@@ -37,7 +37,9 @@ func (v *vorbisDecoder) readAudioPacket(page ogg.Page, num_channels int) {
     submap_number := mapping.muxs[i]
     floor_number := mapping.submaps[submap_number].floor
     floor := v.Floor_configs[floor_number]
-    floor_outputs[i] = floor.Decode(br, v.Codebooks, len(window))
+
+    // TODO: Not entirely sure we should be dividing by two here...
+    floor_outputs[i] = floor.Decode(br, v.Codebooks, len(window) / 2)
   }
 
   if br.CheckError() != nil {
@@ -78,6 +80,45 @@ func (v *vorbisDecoder) readAudioPacket(page ogg.Page, num_channels int) {
         residue_outputs[j] = residues[ch]
         ch++
       }
+    }
+  }
+
+  // inverse coupling
+  for i := len(mapping.couplings) - 1; i >= 0; i-- {
+    mag := residue_outputs[mapping.couplings[i].magnitude]
+    ang := residue_outputs[mapping.couplings[i].angle]
+    var nM, nA float64
+    for j := range mag {
+      M := mag[j]
+      A := ang[j]
+      if M > 0 {
+        if A > 0 {
+          nM = M
+          nA = M - A
+        } else {
+          nA = M
+          nM = M + A
+        }
+      } else {
+        if A > 0 {
+          nM = M
+          nA = M + A
+        } else {
+          nA = M
+          nM = M - A
+        }
+      }
+      mag[j] = nM
+      ang[j] = nA
+    }
+  }
+
+  // dot product
+  fmt.Printf("%d %d\n", len(floor_outputs), len(residue_outputs))
+  for i := range floor_outputs {
+  fmt.Printf("%d %d\n", len(floor_outputs[i]), len(residue_outputs[i]))
+    for j := range floor_outputs[i] {
+      floor_outputs[i][j] *= residue_outputs[i][j]
     }
   }
 }
