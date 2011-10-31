@@ -34,7 +34,6 @@ func readResidue(br *BitReader) Residue {
   if residue_type < 0 || residue_type > 2 {
     panic("Unknown residue type.")
   }
-  print(residue_type, "\n")
   switch residue_type {
     case 1:
       residue = &residue1{}

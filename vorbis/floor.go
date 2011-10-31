@@ -266,7 +266,7 @@ func init() {
 
 type Floor interface {
   // If Decode returns nil it indicates that this floor curve is unused.
-  Decode(*BitReader, []Codebook) []float64
+  Decode(*BitReader, []Codebook, int) []float64
 }
 
 type Floor0 struct {
@@ -281,12 +281,11 @@ type Floor0 struct {
 
 // TODO: Floor0 is not done, but should be completed prior to release
 // TODO: Need to find a vorbis file that actually uses floor0 for testing
-func (f *Floor0) Decode(br *BitReader, codebooks []Codebook) []float64 {
+func (f *Floor0) Decode(br *BitReader, codebooks []Codebook, n int) []float64 {
   panic("Floor0 not complete: notify devs")
   amplitude := int(br.ReadBits(f.amplitude_bits))
   if amplitude > 0 {
     var coefficient []float64
-    print(coefficient)
     book_num := ilog(uint32(len(f.books)))
     if book_num >= len(f.books) {
       panic("Floor codebook index out of range.")
@@ -360,7 +359,7 @@ type floorClass struct {
   subclass_books []int
 }
 
-func (f *Floor1) Decode(br *BitReader, codebooks []Codebook) []float64 {
+func (f *Floor1) Decode(br *BitReader, codebooks []Codebook, n int) []float64 {
   // Check the non-zero bit
   if br.ReadBits(1) == 0 {
     return nil
@@ -373,7 +372,7 @@ func (f *Floor1) Decode(br *BitReader, codebooks []Codebook) []float64 {
   }
 
   // Amplitude value synthesis
-  return f.computeCurve(br, Ys, codebooks)
+  return f.computeCurve(br, Ys, codebooks, n)
 }
 
 func (f *Floor1) decodeYs(br *BitReader, codebooks []Codebook) []int {
@@ -413,7 +412,7 @@ func (f *Floor1) decodeYs(br *BitReader, codebooks []Codebook) []int {
   return Ys
 }
 
-func (f *Floor1) computeCurve(br *BitReader, Ys []int, codebooks []Codebook) []float64 {
+func (f *Floor1) computeCurve(br *BitReader, Ys []int, codebooks []Codebook, n int) []float64 {
   var rnge int
   switch f.multiplier - 1 {
     case 0:
@@ -425,10 +424,14 @@ func (f *Floor1) computeCurve(br *BitReader, Ys []int, codebooks []Codebook) []f
     case 3:
       rnge = 64
   }
+
   step_2 := make([]bool, len(f.Xs))
   step_2[0] = true
   step_2[1] = true
-  final_Ys := []int{ Ys[0], Ys[1] }
+
+  final_Ys := make([]int, len(f.Xs))
+  final_Ys[0] = Ys[0]
+  final_Ys[1] = Ys[1]
 
   // Amplitude Value Synthesis
   for i := 2; i < len(f.Xs); i++ {
@@ -478,7 +481,8 @@ func (f *Floor1) computeCurve(br *BitReader, Ys []int, codebooks []Codebook) []f
   hx := 0
   lx := 0
   ly := final_Ys[0] * f.multiplier
-  floor := make([]int, len(f.Xs))
+
+  floor := make([]int, n)
   var hy int
   for i := 1; i < len(final_Ys); i++ {
     if step_2[i] {
@@ -489,15 +493,16 @@ func (f *Floor1) computeCurve(br *BitReader, Ys []int, codebooks []Codebook) []f
       ly = hy
     }
   }
-  n := 0 // TODO: WHAT IS THIS!?
+
   if hx < n {
+    // TODO: This is silly, it's just a horizontal line
     renderLine(hx, hy, n, hy, floor)
   } else if hx > n {
     floor = floor[0 : n]
   }
   amps := make([]float64, n)
   for i := range amps {
-    amps[i] = inverse_db_table[final_Ys[i]]
+    amps[i] = inverse_db_table[floor[i]]
   }
   return amps
 }

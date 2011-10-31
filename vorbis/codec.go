@@ -20,21 +20,21 @@ func (v *vorbisDecoder) readAudioPacket(page ogg.Page, num_channels int) {
   br := MakeBitReader(v.buffer)
   if br.ReadBits(1) != 0 {
     fmt.Printf("Warning: Not an audio packet")
+    return
   }
 
   mode_number := ilog(uint32(len(v.Mode_configs)) - 1)
   mode := v.Mode_configs[mode_number]
   mapping := v.Mapping_configs[mode.mapping]
 
-  _ = v.generateWindow(br, mode)
+  window := v.generateWindow(br, mode)
 
   // Floor curves
   for i := 0; i < num_channels; i++ {
     submap_number := mapping.muxs[i]
     floor_number := mapping.submaps[submap_number].floor
     floor := v.Floor_configs[floor_number]
-    floor.Decode(br, v.Codebooks)
-    // floor.Decode(br)
+    floor.Decode(br, v.Codebooks, len(window))
   }
 }
 

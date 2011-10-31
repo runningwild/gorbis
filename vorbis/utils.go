@@ -23,12 +23,12 @@ func ilog(n uint32) int {
 }
 
 func lowNeighbor(v []int, index int) int {
-  best := 0
-  max := v[0]
   val := v[index]
+  best := 0
+  max := val
   for i := 1; i < index; i++ {
     if v[i] >= val { continue }
-    if v[i] > max {
+    if v[i] > max || max == val {
       best = i
       max = v[i]
     }
@@ -37,12 +37,12 @@ func lowNeighbor(v []int, index int) int {
 }
 
 func highNeighbor(v []int, index int) int {
-  best := 0
-  min := v[0]
   val := v[index]
+  best := 0
+  min := val
   for i := 1; i < index; i++ {
     if v[i] <= val { continue }
-    if v[i] < min {
+    if v[i] < min || min == val {
       best = i
       min = v[i]
     }
@@ -91,7 +91,7 @@ func renderLine(x0,y0,x1,y1 int, v []int) {
   ady = ady - abs_base * adx
 
   v[x] = y
-  for x := x0 + 1; x < x1 - 1; x++ {
+  for x := x0 + 1; x < x1; x++ {
     err += ady
     if err >= adx {
       err -= adx
