@@ -42,6 +42,7 @@ func (book *Codebook) DecodeScalar(br *BitReader) int {
   var word uint32
   for length := 0; length < 32; length++ {
     for i := range book.Entries {
+      if book.Entries[i].Unused { continue }
       if book.Entries[i].Length == length && book.Entries[i].Codeword == word {
         return i
       }
