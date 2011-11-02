@@ -1,5 +1,5 @@
 package vorbis
-
+import "fmt"
 type Residue interface {
   Decode(br *BitReader, books []Codebook, ch int, do_not_decode []bool, n int) [][]float64
 }
@@ -19,7 +19,7 @@ type residue0 struct {
   residueBase
 }
 func (r *residue0) Decode(br *BitReader, books []Codebook, ch int, do_not_decode []bool, n int) [][]float64 {
-  print("0\n")
+  fmt.Printf("starti ng format 0\n")
   return r.residueBase.decode(br, books, ch, do_not_decode, n, 0)
 }
 
@@ -27,7 +27,7 @@ type residue1 struct {
   residueBase
 }
 func (r *residue1) Decode(br *BitReader, books []Codebook, ch int, do_not_decode []bool, n int) [][]float64 {
-  print("1\n")
+  print("starting format 1\n")
   return r.residueBase.decode(br, books, ch, do_not_decode, n, 1)
 }
 
@@ -35,7 +35,7 @@ type residue2 struct {
   residueBase
 }
 func (r *residue2) Decode(br *BitReader, books []Codebook, ch int, do_not_decode []bool, n int) [][]float64 {
-
+fmt.Printf("Starting format 2: %d, %v\n", ch, do_not_decode)
   decode := false
   for i := range do_not_decode {
     if !do_not_decode[i] {
@@ -45,6 +45,7 @@ func (r *residue2) Decode(br *BitReader, books []Codebook, ch int, do_not_decode
   }
 
   var data []float64
+  fmt.Printf("Decode: %t\n", decode)
   if !decode {
     data = make([]float64, ch * n)
   } else {
@@ -68,17 +69,19 @@ func (r *residue2) Decode(br *BitReader, books []Codebook, ch int, do_not_decode
 
 func (r *residueBase) decode(br *BitReader, books []Codebook, ch int, do_not_decode []bool, n int, mode int) [][]float64 {
   limit_begin := r.begin
-  if limit_begin < n {
+  if limit_begin > n {
     limit_begin = n
   }
   limit_end := r.end
-  if limit_end < n {
+  if limit_end > n {
     limit_end = n
   }
 
   book := books[r.classbook]
   classwords_per_codeword := book.Dimensions
   n_to_read := limit_end - limit_begin
+  fmt.Printf("Residue Diff: %d %d %d %d\n", limit_begin, limit_end, n_to_read, n)
+  fmt.Printf("Reside data: %d %d\n", r.classbook, r.partition_size)
   partitions_to_read := n_to_read / r.partition_size
 
   residue_vecs := make([][]float64, ch)
@@ -88,8 +91,10 @@ func (r *residueBase) decode(br *BitReader, books []Codebook, ch int, do_not_dec
 
   // In any mode we cut out early if there is nowhere to put the data
   if n_to_read == 0 {
+    fmt.Printf("Bailing: nothing to read\n")
     return residue_vecs
   }
+  fmt.Printf("don't decode: %v\n", do_not_decode)
 
   classifications := make([][]int, ch)
   for i := range classifications {
@@ -111,10 +116,16 @@ func (r *residueBase) decode(br *BitReader, books []Codebook, ch int, do_not_dec
       }
       for i := 0; i < classwords_per_codeword && partition_count < partitions_to_read; i++ {
         for j := 0; j < ch; j++ {
-          if do_not_decode[j] { continue }
+          if do_not_decode[j] {
+            partition_count++
+            continue
+          }
           vq_class := classifications[j][partition_count]
           vq_book := r.books[vq_class][pass]
-          if vq_book == -1 { continue }
+          if vq_book == -1 {
+            partition_count++
+            continue
+          }
           book := books[vq_book]
 
           n := r.partition_size
@@ -123,20 +134,25 @@ func (r *residueBase) decode(br *BitReader, books []Codebook, ch int, do_not_dec
 
           if mode == 0 {
             // format 0
+            print("format 0\n")
             step := n / book.Dimensions
             for i := 0; i < step; i++ {
               temp := book.DecodeVector(br)
               for j := 0; j < book.Dimensions; j++ {
                 v[offset + i + j * step] += temp[j]
+                print("temp: ", temp[j])
               }
             }
           } else {
             // format 1 (used by format 2)
+            print("format 1\n")
             i := 0
             for i < n {
+              fmt.Printf("i: %d\n", i)
               temp := book.DecodeVector(br)
               for j := 0; j < book.Dimensions; j++ {
                 v[offset + i] += temp[j]
+                print("temp: ", temp[j])
                 i++
               }
             }

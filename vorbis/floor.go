@@ -1,6 +1,7 @@
 package vorbis
 
 import "sort"
+import "fmt"
 
 var inverse_db_table []float64
 func init() {
@@ -362,6 +363,7 @@ type floorClass struct {
 func (f *Floor1) Decode(br *BitReader, codebooks []Codebook, n int) []float64 {
   // Check the non-zero bit
   if br.ReadBits(1) == 0 {
+    fmt.Printf("Nonzero bit is not set - bailing.\n")
     return nil
   }
 
@@ -377,14 +379,14 @@ func (f *Floor1) Decode(br *BitReader, codebooks []Codebook, n int) []float64 {
 
 func (f *Floor1) decodeYs(br *BitReader, codebooks []Codebook) []int {
   var rnge uint32
-  switch f.multiplier - 1 {
-    case 0:
-      rnge = 256
+  switch f.multiplier {
     case 1:
-      rnge = 128
+      rnge = 256
     case 2:
-      rnge = 86
+      rnge = 128
     case 3:
+      rnge = 86
+    case 4:
       rnge = 64
   }
   var Ys []int
@@ -396,14 +398,20 @@ func (f *Floor1) decodeYs(br *BitReader, codebooks []Codebook) []int {
     cbits := uint(class.subclass)
     csub := (1 << cbits) - 1
     cval := 0
+    fmt.Printf("%d %d %d\n", cdim, cbits, csub)
     if cbits > 0 {
-      cval = codebooks[class.masterbook].DecodeScalar(br)
+      temp := codebooks[class.masterbook].DecodeScalar(br)
+      fmt.Printf("Decoded(%d) %d\n", class.masterbook, temp)
+      cval = temp
     }
     for j := 0; j < cdim; j++ {
       book := class.subclass_books[cval & csub]
+      fmt.Printf("Book: %d\n", cval & csub)
       cval = cval >> cbits
       if book >= 0 {
-        Ys = append(Ys, codebooks[book].DecodeScalar(br))
+        temp := codebooks[book].DecodeScalar(br)
+        fmt.Printf("Decoded %d\n", temp)
+        Ys = append(Ys, temp)
       } else {
         Ys = append(Ys, 0)
       }
@@ -414,14 +422,14 @@ func (f *Floor1) decodeYs(br *BitReader, codebooks []Codebook) []int {
 
 func (f *Floor1) computeCurve(br *BitReader, Ys []int, codebooks []Codebook, n int) []float64 {
   var rnge int
-  switch f.multiplier - 1 {
-    case 0:
-      rnge = 256
+  switch f.multiplier {
     case 1:
-      rnge = 128
+      rnge = 256
     case 2:
-      rnge = 86
+      rnge = 128
     case 3:
+      rnge = 86
+    case 4:
       rnge = 64
   }
 

@@ -4,8 +4,11 @@ import (
   "fmt"
   "ogg"
   "bytes"
+  "io"
   "os"
   "math"
+  "cmath"
+  "fftw"
 )
 
 var magic_string string = "\x01vorbis"
@@ -24,13 +27,15 @@ func (v *vorbisDecoder) readAudioPacket(buffer io.ByteReader, num_channels int) 
     fmt.Printf("Warning: Not an audio packet")
     return
   }
-
-  mode_number := ilog(uint32(len(v.Mode_configs)) - 1)
+  mode_number := int(br.ReadBits(ilog(uint32(len(v.Mode_configs)) - 1)))
   mode := v.Mode_configs[mode_number]
+  fmt.Printf("Mode number: %d\n", mode_number)
+  fmt.Printf("Mode blockflag: %t\n", mode.block_flag)
   mapping := v.Mapping_configs[mode.mapping]
 
   window := v.generateWindow(br, mode)
 
+fmt.Printf("Floor\n")
   // Floor curves
   // If the output for a floor for a particular channel is 'unused' that
   // element of the array will be nil
@@ -38,11 +43,13 @@ func (v *vorbisDecoder) readAudioPacket(buffer io.ByteReader, num_channels int) 
   for i := 0; i < num_channels; i++ {
     submap_number := mapping.muxs[i]
     floor_number := mapping.submaps[submap_number].floor
+    fmt.Printf("Floor number %d\n", floor_number)
     floor := v.Floor_configs[floor_number]
 
     // TODO: Not entirely sure we should be dividing by two here...
     floor_outputs[i] = floor.Decode(br, v.Codebooks, len(window) / 2)
   }
+//  fmt.Printf("Floors\n%v\n\n", floor_outputs)
 
   if br.CheckError() != nil {
     // TODO: Need to handle an EOF error by zeroing channel data and skipping
@@ -62,6 +69,7 @@ func (v *vorbisDecoder) readAudioPacket(buffer io.ByteReader, num_channels int) 
     }
   }
 
+fmt.Printf("Residue\n")
   // residue decode
   do_not_decode := make([]bool, num_channels)
   residue_outputs := make([][]float64, num_channels)
@@ -75,7 +83,7 @@ func (v *vorbisDecoder) readAudioPacket(buffer io.ByteReader, num_channels int) 
     }
 
     residues := v.Residue_configs[submap.residue].Decode(br, v.Codebooks, ch, do_not_decode, len(window)/2)
-
+fmt.Printf("residue: %v\n", residues)
     ch = 0
     for j := 0; j < num_channels; j++ {
       if mapping.muxs[j] == i {
@@ -85,6 +93,7 @@ func (v *vorbisDecoder) readAudioPacket(buffer io.ByteReader, num_channels int) 
     }
   }
 
+fmt.Printf("Coupling\n")
   // inverse coupling
   for i := len(mapping.couplings) - 1; i >= 0; i-- {
     mag := residue_outputs[mapping.couplings[i].magnitude]
@@ -122,6 +131,23 @@ func (v *vorbisDecoder) readAudioPacket(buffer io.ByteReader, num_channels int) 
     for j := range floor_outputs[i] {
       floor_outputs[i][j] *= residue_outputs[i][j]
     }
+  }
+  // iMDCT
+  // TODO: This needs to be written in native go - half the point of this is
+  // to support vorbis without requiring cgo.
+  var final [][]float64
+//  fmt.Printf("floors: %v\n", floor_outputs)
+  for i := range mapping.couplings {
+    mag := mapping.couplings[i].magnitude
+    ang := mapping.couplings[i].angle
+    if floor_outputs[mag] == nil { continue }
+    in := make([]complex128, len(floor_outputs[mag]))
+    next := make([]float64, 2 * (len(floor_outputs[ang]) - 1))
+    for i := range in {
+      in[i] = cmath.Rect(floor_outputs[mag][i], floor_outputs[ang][i])
+    }
+    fftw.PlanDftC2R1d(in, next, fftw.Estimate).Execute()
+    final = append(final, next)
   }
 }
 
