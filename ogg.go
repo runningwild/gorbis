@@ -6,6 +6,7 @@ import (
   "encoding/binary"
   "hash/crc32"
   "fmt"
+  "bytes"
 )
 
 type HeaderFixed struct {
@@ -30,10 +31,14 @@ type Page struct {
   Data []byte
 }
 
+type Packet struct {
+  Granule_position     uint64
+  Page_sequence_number uint32
+  Data []byte
+}
 
 type Codec interface {
-  Add(Page)
-  Finish()
+  Input() chan<- Packet
 }
 
 var ogg_table *crc32.Table
@@ -95,13 +100,17 @@ func DecodePage(in io.Reader) (Page, os.Error) {
   return page, nil
 }
 
+type codecBuffer struct {
+  codec  Codec
+  buffer *bytes.Buffer
+}
+
 func Decode(in io.Reader) os.Error {
   fmt.Printf("")
-  streams := make(map[uint32]Codec)
+  streams := make(map[uint32]*codecBuffer)
   var page Page
   var err os.Error
   for ; err == nil; page,err = DecodePage(in) {
-//    fmt.Printf("Header: %d %v\n", page.Header.Header_type, page.Header.Segment_table)
     serial := page.Bitstream_serial_number
     if page.Header_type & 0x2 != 0 {
       // First packet in a bitstream, shouldn't already have a codec for it
@@ -110,17 +119,29 @@ func Decode(in io.Reader) os.Error {
         // TODO: issue a warning, there was already a codec here
         continue
       }
-      streams[serial] = GetCodec(page)
+      streams[serial] = &codecBuffer{ GetCodec(page), bytes.NewBuffer(nil) }
       fmt.Printf("Set codec(%x): %v\n", serial, streams[serial])
     }
-    codec := streams[serial]
-    if codec == nil { 
-      fmt.Printf("nil\n")
+    cb,ok := streams[serial]
+    if !ok { 
+      fmt.Printf("!ok\n")
       continue
     }
-    codec.Add(page)
+    for _,seg_len := range page.Segment_table {
+      cb.buffer.Write(page.Data[0 : seg_len])
+      page.Data = page.Data[seg_len : ]
+      if seg_len != 255 {
+        cb.codec.Input() <-
+          Packet{
+            page.Granule_position,
+            page.Page_sequence_number,
+            cb.buffer.Bytes(),
+          }
+        cb.buffer = bytes.NewBuffer(nil)
+      }
+    }
     if page.Header_type & 0x4 != 0 {
-      codec.Finish()
+      close(cb.codec.Input())
       streams[serial] = nil,false
     }
   }

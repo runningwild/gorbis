@@ -16,8 +16,10 @@ func check(err os.Error) {
   }
 }
 
-func (v *vorbisDecoder) readAudioPacket(page ogg.Page, num_channels int) {
-  br := MakeBitReader(v.buffer)
+func (v *vorbisDecoder) readAudioPacket(buffer io.ByteReader, num_channels int) {
+  br := MakeBitReader(buffer)
+
+  fmt.Printf("Start packet\n")
   if br.ReadBits(1) != 0 {
     fmt.Printf("Warning: Not an audio packet")
     return
@@ -198,7 +200,8 @@ func init() {
 
 func makeVorbisDecoder() ogg.Codec {
   var v vorbisDecoder
-  v.buffer = bytes.NewBuffer(make([]byte, 0, 256))
+  v.input = make(chan ogg.Packet, 25)
+  go v.routine()
   return &v
 }
 
@@ -215,53 +218,47 @@ type vorbisDecoder struct {
   idHeader
   commentHeader
   setupHeader
-  buffer *bytes.Buffer
+
+  input chan ogg.Packet
 }
-func (v *vorbisDecoder) Add(page ogg.Page) {
-  // Might neet to paste a few packets together before we start reading
-  v.buffer.Write(page.Data)
-  if len(page.Segment_table) > 0 && page.Segment_table[len(page.Segment_table) - 1] == 255 {
-    return
-  }
+func (v *vorbisDecoder) Input() chan<- ogg.Packet {
+  return v.input
+}
+func (v *vorbisDecoder) routine() {
+  for packet := range v.input {
+    buffer := bytes.NewBuffer(packet.Data)
+    switch v.mode {
+      case readId:
+        v.idHeader.read(buffer)
+        v.mode++
+        fallthrough
 
-  switch v.mode {
-    case readId:
-      fmt.Printf("Read id\n")
-      v.idHeader.read(v.buffer)
-      fmt.Printf("After id: %d\n", v.buffer.Len())
-      v.mode++
-      fallthrough
+      case readComment:
+        // TODO: EOF during this packet is acceptable
+        if buffer.Len() == 0 {
+          // This could happen if the id and comment headers aren't in the
+          // same packet.  The spec really doesn't specify how it should be.
+          // TODO: For this pair of headers this might be specified to never
+          //       happen, so remove this if statement if that's the case.
+          continue
+        }
+        v.commentHeader.read(buffer)
+        v.mode++
+        fallthrough
 
-    case readComment:
-      if v.buffer.Len() == 0 {
-        // This could happen if the id and comment headers aren't in the
-        // same packet.  The spec really doesn't specify how it should be.
-        // TODO: For this pair of headers this might be specified to never
-        //       happen, so remove this if statement if that's the case.
-        return
-      }
-      fmt.Printf("Read comment\n")
-      v.commentHeader.read(v.buffer)
-      fmt.Printf("After comment: %d\n", v.buffer.Len())
-      v.mode++
-      fallthrough
+      case readSetup:
+        if buffer.Len() == 0 {
+          // This could happen if the comment and setup headers aren't in the
+          // same packet.  The spec really doesn't specify how it should be.
+          continue
+        }
+        v.setupHeader.read(buffer, int(v.Channels))
+        v.mode++
+        total = 0
 
-    case readSetup:
-      if v.buffer.Len() == 0 {
-        // This could happen if the comment and setup headers aren't in the
-        // same packet.  The spec really doesn't specify how it should be.
-        return
-      }
-      v.setupHeader.read(v.buffer, int(v.Channels))
-      v.mode++
-
-    case readData:
-      v.readAudioPacket(page, int(v.Channels))
-      v.buffer.Truncate(0)
+      case readData:
+        v.readAudioPacket(buffer, int(v.Channels))
+    }
   }
 }
-func (v *vorbisDecoder) Finish() {
-  fmt.Printf("Finished stream\n")
-}
-
 
