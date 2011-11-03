@@ -3,7 +3,7 @@ package vorbis
 type Mapping struct {
   couplings []coupling
 
-  muxs    []int
+  muxs []int
 
   submaps []submap
 }
@@ -16,7 +16,7 @@ type submap struct {
   residue int
 }
 
-func readMapping(br *BitReader, num_channels,num_floors,num_residues int) Mapping {
+func readMapping(br *BitReader, num_channels, num_floors, num_residues int) Mapping {
   mapping_type := int(br.ReadBits(16))
   if mapping_type != 0 {
     panic("Found a non-zero mapping type.")
@@ -62,7 +62,7 @@ func readMapping(br *BitReader, num_channels,num_floors,num_residues int) Mappin
 
   mapping.submaps = make([]submap, submaps)
   for i := range mapping.submaps {
-    br.ReadBits(8)  // explicitly discarded
+    br.ReadBits(8) // explicitly discarded
     mapping.submaps[i].floor = int(br.ReadBits(8))
     if mapping.submaps[i].floor >= num_floors {
       panic("Mapping submap floor is out of range.")

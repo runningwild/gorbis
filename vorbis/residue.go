@@ -1,5 +1,7 @@
 package vorbis
+
 import "fmt"
+
 type Residue interface {
   Decode(br *BitReader, books []Codebook, ch int, do_not_decode []bool, n int) [][]float64
 }
@@ -18,6 +20,7 @@ type residueBase struct {
 type residue0 struct {
   residueBase
 }
+
 func (r *residue0) Decode(br *BitReader, books []Codebook, ch int, do_not_decode []bool, n int) [][]float64 {
   fmt.Printf("starti ng format 0\n")
   return r.residueBase.decode(br, books, ch, do_not_decode, n, 0)
@@ -26,6 +29,7 @@ func (r *residue0) Decode(br *BitReader, books []Codebook, ch int, do_not_decode
 type residue1 struct {
   residueBase
 }
+
 func (r *residue1) Decode(br *BitReader, books []Codebook, ch int, do_not_decode []bool, n int) [][]float64 {
   print("starting format 1\n")
   return r.residueBase.decode(br, books, ch, do_not_decode, n, 1)
@@ -34,8 +38,9 @@ func (r *residue1) Decode(br *BitReader, books []Codebook, ch int, do_not_decode
 type residue2 struct {
   residueBase
 }
+
 func (r *residue2) Decode(br *BitReader, books []Codebook, ch int, do_not_decode []bool, n int) [][]float64 {
-fmt.Printf("Starting format 2: %d, %v\n", ch, do_not_decode)
+  fmt.Printf("Starting format 2: %d, %v\n", ch, do_not_decode)
   decode := false
   for i := range do_not_decode {
     if !do_not_decode[i] {
@@ -47,9 +52,9 @@ fmt.Printf("Starting format 2: %d, %v\n", ch, do_not_decode)
   var data []float64
   fmt.Printf("Decode: %t\n", decode)
   if !decode {
-    data = make([]float64, ch * n)
+    data = make([]float64, ch*n)
   } else {
-    data = r.decode(br, books, 1, []bool{ false }, ch * n, 1)[0]
+    data = r.decode(br, books, 1, []bool{false}, ch*n, 1)[0]
   }
 
   // TODO: spec says to do this step even if we are using a blank array
@@ -60,7 +65,7 @@ fmt.Printf("Starting format 2: %d, %v\n", ch, do_not_decode)
   }
   for i := 0; i < n; i++ {
     for j := 0; j < ch; j++ {
-      output[j][i] = data[i + ch * j]
+      output[j][i] = data[i+ch*j]
     }
   }
 
@@ -106,10 +111,12 @@ func (r *residueBase) decode(br *BitReader, books []Codebook, ch int, do_not_dec
     for partition_count < partitions_to_read {
       if pass == 0 {
         for j := 0; j < ch; j++ {
-          if do_not_decode[j] { continue }
+          if do_not_decode[j] {
+            continue
+          }
           temp := book.DecodeScalar(br)
           for i := classwords_per_codeword - 1; i >= 0; i-- {
-            classifications[j][i + partition_count] = temp % r.num_classifications
+            classifications[j][i+partition_count] = temp % r.num_classifications
             temp /= r.num_classifications
           }
         }
@@ -130,7 +137,7 @@ func (r *residueBase) decode(br *BitReader, books []Codebook, ch int, do_not_dec
 
           n := r.partition_size
           v := residue_vecs[j]
-          offset := limit_begin + partition_count * r.partition_size
+          offset := limit_begin + partition_count*r.partition_size
 
           if mode == 0 {
             // format 0
@@ -139,7 +146,7 @@ func (r *residueBase) decode(br *BitReader, books []Codebook, ch int, do_not_dec
             for i := 0; i < step; i++ {
               temp := book.DecodeVector(br)
               for j := 0; j < book.Dimensions; j++ {
-                v[offset + i + j * step] += temp[j]
+                v[offset+i+j*step] += temp[j]
                 print("temp: ", temp[j])
               }
             }
@@ -151,7 +158,7 @@ func (r *residueBase) decode(br *BitReader, books []Codebook, ch int, do_not_dec
               fmt.Printf("i: %d\n", i)
               temp := book.DecodeVector(br)
               for j := 0; j < book.Dimensions; j++ {
-                v[offset + i] += temp[j]
+                v[offset+i] += temp[j]
                 print("temp: ", temp[j])
                 i++
               }
@@ -176,12 +183,12 @@ func readResidue(br *BitReader) Residue {
   }
   base.read(br)
   switch residue_type {
-    case 0:
-      residue = &residue0{ base }
-    case 1:
-      residue = &residue1{ base }
-    case 2:
-      residue = &residue2{ base }
+  case 0:
+    residue = &residue0{base}
+  case 1:
+    residue = &residue1{base}
+  case 2:
+    residue = &residue2{base}
   }
 
   return residue
@@ -203,7 +210,7 @@ func (r *residueBase) read(br *BitReader) {
     if bit_flag {
       high_bits = int(br.ReadBits(5))
     }
-    cascades[i] = uint32(high_bits * 8 + low_bits)
+    cascades[i] = uint32(high_bits*8 + low_bits)
   }
 
   r.books = make([][]int, r.num_classifications)

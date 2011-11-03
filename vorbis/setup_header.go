@@ -15,7 +15,7 @@ type setupHeader struct {
 }
 
 func (header *setupHeader) read(buffer *bytes.Buffer, num_channels int) {
-  b,_ := buffer.ReadByte()
+  b, _ := buffer.ReadByte()
   if b != 5 {
     panic(fmt.Sprintf("Header type == %d, expected type == 5.", b))
   }
@@ -24,9 +24,8 @@ func (header *setupHeader) read(buffer *bytes.Buffer, num_channels int) {
     panic("vorbis string not found in setup header")
   }
 
-
   // Decode Codebooks
-  codebook_count,_ := buffer.ReadByte()
+  codebook_count, _ := buffer.ReadByte()
   codebook_count++
   header.Codebooks = make([]Codebook, int(codebook_count))
   br := MakeBitReader(buffer)
@@ -76,4 +75,3 @@ func (header *setupHeader) read(buffer *bytes.Buffer, num_channels int) {
     panic("Framing error in setup header.")
   }
 }
-

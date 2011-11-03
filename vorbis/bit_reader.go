@@ -1,16 +1,14 @@
 package vorbis
 
-import (
-  "io"
-  "os"
-)
+import "io"
 
 type BitReader struct {
   in      io.ByteReader
   current byte
   bit_pos int
-  err     os.Error
+  err     error
 }
+
 func MakeBitReader(in io.ByteReader) *BitReader {
   var br BitReader
   br.in = in
@@ -18,7 +16,7 @@ func MakeBitReader(in io.ByteReader) *BitReader {
   return &br
 }
 
-func (br *BitReader) CheckError() os.Error {
+func (br *BitReader) CheckError() error {
   return br.err
 }
 
@@ -34,7 +32,7 @@ func (br *BitReader) readAtMost(n int) (read int, bits uint32) {
   br.bit_pos += read
   if br.bit_pos == 8 {
     br.bit_pos = 0
-    var err os.Error
+    var err error
     br.current, err = br.in.ReadByte()
     if err != nil {
       br.err = err
@@ -46,7 +44,7 @@ func (br *BitReader) readAtMost(n int) (read int, bits uint32) {
 var total int
 
 // 0 <= n < 32
-func (br *BitReader) ReadBits(n int) (uint32) {
+func (br *BitReader) ReadBits(n int) uint32 {
   total += n
   print("Bits: ", n, " -> ", total, "\n")
   if br.err != nil {
@@ -55,11 +53,10 @@ func (br *BitReader) ReadBits(n int) (uint32) {
   var bits uint32
   pos := 0
   for n > 0 {
-    read,next := br.readAtMost(n)
+    read, next := br.readAtMost(n)
     bits = bits | (next << uint(pos))
     pos += read
     n -= read
   }
   return bits
 }
-

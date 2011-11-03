@@ -24,7 +24,7 @@ type Codebook struct {
 func toBin(n uint32, l int) string {
   ret := ""
   for n > 0 {
-    if n % 2 == 0 {
+    if n%2 == 0 {
       ret = "0" + ret
     } else {
       ret = "1" + ret
@@ -42,7 +42,9 @@ func (book *Codebook) DecodeScalar(br *BitReader) int {
   var word uint32
   for length := 0; length < 32; length++ {
     for i := range book.Entries {
-      if book.Entries[i].Unused { continue }
+      if book.Entries[i].Unused {
+        continue
+      }
       if book.Entries[i].Length == length && book.Entries[i].Codeword == word {
         return i
       }
@@ -62,10 +64,10 @@ func (book *Codebook) DecodeVector(br *BitReader) []float64 {
 
 func (book *Codebook) allocateTable() {
   // Build the table out of a single array
-  vector := make([]float64, len(book.Entries) * book.Dimensions)
+  vector := make([]float64, len(book.Entries)*book.Dimensions)
   book.Value_vectors = make([][]float64, book.Dimensions)
   for i := range book.Value_vectors {
-    book.Value_vectors[i] = vector[i * len(book.Entries) : (i + 1) * len(book.Entries)]
+    book.Value_vectors[i] = vector[i*len(book.Entries) : (i+1)*len(book.Entries)]
   }
 }
 
@@ -77,7 +79,7 @@ func (book *Codebook) BuildVQType1() {
     for dim := range book.Value_vectors[entry] {
       offset := (entry / index_divisor) % len(book.Multiplicands)
       // TODO: The java implementation takes the absolute value of the Multiplicand here, find out if that is necessary or meaningful
-      book.Value_vectors[entry][dim] = float64(book.Multiplicands[offset]) * book.Delta_value + book.Minimum_value + last
+      book.Value_vectors[entry][dim] = float64(book.Multiplicands[offset])*book.Delta_value + book.Minimum_value + last
       if book.Sequence_p {
         last = book.Value_vectors[entry][dim]
       }
@@ -92,7 +94,7 @@ func (book *Codebook) BuildVQType2() {
     offset := entry * book.Dimensions
     for dim := range book.Value_vectors[entry] {
       // TODO: Same thing with absolute value in the java implementation
-      book.Value_vectors[entry][dim] = float64(book.Multiplicands[offset]) * book.Delta_value + book.Minimum_value + last
+      book.Value_vectors[entry][dim] = float64(book.Multiplicands[offset])*book.Delta_value + book.Minimum_value + last
       if book.Sequence_p {
         last = book.Value_vectors[entry][dim]
       }
@@ -105,20 +107,24 @@ func (book *Codebook) AssignCodewords() {
   marker := make([]uint32, 33)
   for i := range book.Entries {
     entry := &book.Entries[i]
-    if entry.Unused { continue }
-    if entry.Length == 0 { continue }
+    if entry.Unused {
+      continue
+    }
+    if entry.Length == 0 {
+      continue
+    }
     word := marker[entry.Length]
-    if entry.Length < 32 && (word >> uint(entry.Length)) != 0 {
+    if entry.Length < 32 && (word>>uint(entry.Length)) != 0 {
       panic("Codebook contains an overspecified huffman tree.")
     }
 
     entry.Codeword = word
     for j := entry.Length; j > 0; j-- {
-      if marker[j] & 1 != 0 {
+      if marker[j]&1 != 0 {
         if j == 1 {
           marker[1]++
         } else {
-          marker[j] = marker[j - 1] << 1
+          marker[j] = marker[j-1] << 1
           break
         }
       }
@@ -126,9 +132,9 @@ func (book *Codebook) AssignCodewords() {
     }
 
     for j := entry.Length + 1; j <= 32; j++ {
-      if marker[j] >> 1 == word {
+      if marker[j]>>1 == word {
         word = marker[j]
-        marker[j] = marker[j - 1] << 1
+        marker[j] = marker[j-1] << 1
       } else {
         break
       }
@@ -153,7 +159,7 @@ func (book *Codebook) decode(br *BitReader) {
       current_length := int(br.ReadBits(5)) + 1
       number := int(br.ReadBits(ilog(uint32(num_entries - current_entry))))
       for i := 0; i < number; i++ {
-        book.Entries[current_entry + i].Length = current_length
+        book.Entries[current_entry+i].Length = current_length
       }
       current_length++
       current_entry += number
@@ -182,38 +188,38 @@ func (book *Codebook) decode(br *BitReader) {
   // read the vector lookup table
   Codebook_lookup_type := int(br.ReadBits(4))
   switch Codebook_lookup_type {
-    case 0:
-      // no vector lookup
+  case 0:
+    // no vector lookup
 
-    case 1:
-      fallthrough
-    case 2:
-      book.Minimum_value = float64(math.Float32frombits(br.ReadBits(32)))
-      book.Delta_value = float64(math.Float32frombits(br.ReadBits(32)))
-      Codebook_value_bits := int(br.ReadBits(4) + 1)
-      book.Sequence_p = br.ReadBits(1) == 1
-      var Codebook_lookup_values int
-      if Codebook_lookup_type == 1 {
-        Codebook_lookup_values = Lookup1Values(len(book.Entries), book.Dimensions)
-      } else {
-        Codebook_lookup_values = len(book.Entries) * book.Dimensions
-      }
-      book.Multiplicands = make([]uint32, Codebook_lookup_values)
-      for i := range book.Multiplicands {
-        book.Multiplicands[i] = br.ReadBits(Codebook_value_bits)
-      }
+  case 1:
+    fallthrough
+  case 2:
+    book.Minimum_value = float64(math.Float32frombits(br.ReadBits(32)))
+    book.Delta_value = float64(math.Float32frombits(br.ReadBits(32)))
+    Codebook_value_bits := int(br.ReadBits(4) + 1)
+    book.Sequence_p = br.ReadBits(1) == 1
+    var Codebook_lookup_values int
+    if Codebook_lookup_type == 1 {
+      Codebook_lookup_values = Lookup1Values(len(book.Entries), book.Dimensions)
+    } else {
+      Codebook_lookup_values = len(book.Entries) * book.Dimensions
+    }
+    book.Multiplicands = make([]uint32, Codebook_lookup_values)
+    for i := range book.Multiplicands {
+      book.Multiplicands[i] = br.ReadBits(Codebook_value_bits)
+    }
 
-    default:
-      panic("Unknown vector lookup method")
+  default:
+    panic("Unknown vector lookup method")
   }
 
   // Assign huffman values
   book.AssignCodewords()
 
   switch Codebook_lookup_type {
-    case 1:
-      book.BuildVQType1()
-    case 2:
-      book.BuildVQType2()
+  case 1:
+    book.BuildVQType1()
+  case 2:
+    book.BuildVQType2()
   }
 }

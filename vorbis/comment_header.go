@@ -13,7 +13,7 @@ type commentHeader struct {
 }
 
 func (header *commentHeader) read(buffer *bytes.Buffer) {
-  b,_ := buffer.ReadByte()
+  b, _ := buffer.ReadByte()
   if b != 3 {
     panic(fmt.Sprintf("Header type == %d, expected type == 3.", b))
   }
@@ -33,7 +33,7 @@ func (header *commentHeader) read(buffer *bytes.Buffer) {
     header.User_comments[i] = string(buffer.Next(int(length)))
   }
 
-  framing,_ := buffer.ReadByte()
+  framing, _ := buffer.ReadByte()
   header.Framing = (framing & 0x1) != 0
   if !header.Framing {
     panic("Framing bit not set in comment header")
@@ -41,4 +41,3 @@ func (header *commentHeader) read(buffer *bytes.Buffer) {
 
   fmt.Printf("comment: %v\n", header)
 }
-
