@@ -46,7 +46,6 @@ var total int
 // 0 <= n < 32
 func (br *BitReader) ReadBits(n int) uint32 {
   total += n
-  print("Bits: ", n, " -> ", total, "\n")
   if br.err != nil {
     return 0
   }

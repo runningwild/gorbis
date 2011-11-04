@@ -6,6 +6,7 @@ type CodebookEntry struct {
   Unused   bool
   Length   int
   Codeword uint32
+  Num      int
 }
 
 type Codebook struct {
@@ -46,7 +47,7 @@ func (book *Codebook) DecodeScalar(br *BitReader) int {
         continue
       }
       if book.Entries[i].Length == length && book.Entries[i].Codeword == word {
-        return i
+        return book.Entries[i].Num
       }
     }
     word = word << 1
@@ -58,7 +59,6 @@ func (book *Codebook) DecodeScalar(br *BitReader) int {
 
 func (book *Codebook) DecodeVector(br *BitReader) []float64 {
   index := book.DecodeScalar(br)
-  print("index: ", index, "len: ", len(book.Value_vectors), "\n")
   return book.Value_vectors[index]
 }
 
@@ -73,11 +73,11 @@ func (book *Codebook) allocateTable() {
 
 func (book *Codebook) BuildVQType1() {
   book.allocateTable()
-  for entry := range book.Value_vectors {
+  for dim := range book.Value_vectors[0] {
     last := 0.0
     index_divisor := 1
-    for dim := range book.Value_vectors[entry] {
-      offset := (entry / index_divisor) % len(book.Multiplicands)
+    for entry := range book.Value_vectors {
+      offset := (dim / index_divisor) % len(book.Multiplicands)
       // TODO: The java implementation takes the absolute value of the Multiplicand here, find out if that is necessary or meaningful
       book.Value_vectors[entry][dim] = float64(book.Multiplicands[offset])*book.Delta_value + book.Minimum_value + last
       if book.Sequence_p {
@@ -89,8 +89,8 @@ func (book *Codebook) BuildVQType1() {
 }
 func (book *Codebook) BuildVQType2() {
   book.allocateTable()
+  last := 0.0
   for entry := range book.Value_vectors {
-    last := 0.0
     offset := entry * book.Dimensions
     for dim := range book.Value_vectors[entry] {
       // TODO: Same thing with absolute value in the java implementation
@@ -160,6 +160,7 @@ func (book *Codebook) decode(br *BitReader) {
       number := int(br.ReadBits(ilog(uint32(num_entries - current_entry))))
       for i := 0; i < number; i++ {
         book.Entries[current_entry+i].Length = current_length
+        book.Entries[current_entry+i].Num = current_entry + i
       }
       current_length++
       current_entry += number
@@ -170,10 +171,13 @@ func (book *Codebook) decode(br *BitReader) {
   } else {
     sparse := br.ReadBits(1) == 1
     if sparse {
+      current_entry := 0
       for i := range book.Entries {
         flag := br.ReadBits(1) == 1
         if flag {
           book.Entries[i].Length = int(br.ReadBits(5)) + 1
+          book.Entries[i].Num = current_entry
+          current_entry++
         } else {
           book.Entries[i].Unused = true
         }

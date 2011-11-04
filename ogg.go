@@ -122,7 +122,6 @@ func Decode(in io.Reader) error {
         continue
       }
       streams[serial] = &codecBuffer{GetCodec(page), bytes.NewBuffer(nil)}
-      fmt.Printf("Set codec(%x): %v\n", serial, streams[serial])
     }
     cb, ok := streams[serial]
     if !ok {

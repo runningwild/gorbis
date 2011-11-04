@@ -38,6 +38,4 @@ func (header *commentHeader) read(buffer *bytes.Buffer) {
   if !header.Framing {
     panic("Framing bit not set in comment header")
   }
-
-  fmt.Printf("comment: %v\n", header)
 }
