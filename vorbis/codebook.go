@@ -125,8 +125,8 @@ func (book *Codebook) AssignCodewords() {
           marker[1]++
         } else {
           marker[j] = marker[j-1] << 1
-          break
         }
+        break
       }
       marker[j]++
     }
